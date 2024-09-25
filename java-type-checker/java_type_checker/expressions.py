@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from .types import JavaBuiltInTypes, JavaTypeError
+from .types import JavaBuiltInTypes, JavaTypeError, NoSuchJavaMethod
 
 
 class JavaExpression(object):
@@ -42,7 +42,8 @@ class JavaVariable(JavaExpression):
     def static_type(self):
         return self.declared_type
     
-
+    def check_types(self):
+            return 
     
 class JavaLiteral(JavaExpression):
     """A literal value entered in the code, e.g. `5` in the expression `x + 5`.
@@ -54,6 +55,8 @@ class JavaLiteral(JavaExpression):
     def static_type(self):
         return self.type
 
+    def check_types(self):
+        return 
    
 
 
@@ -77,6 +80,18 @@ class JavaAssignment(JavaExpression):
 
     def static_type(self):
         return self.lhs.static_type()
+    
+    def check_types(self):
+        self.lhs.check_types()
+        self.rhs.check_types()
+        
+        if self.lhs.static_type() == self.rhs.static_type() or self.rhs.static_type().is_subtype_of(self.lhs.static_type()):
+            return
+       
+        raise JavaTypeMismatchError( "Cannot assign {0} to variable {1} of type {2}".format(
+            self.rhs.static_type().name,
+            self.lhs.name,
+            self.lhs.static_type().name))
 
 
 class JavaMethodCall(JavaExpression):
@@ -102,9 +117,38 @@ class JavaMethodCall(JavaExpression):
 
     def static_type(self):
         receiver_type = self.receiver.static_type()
-        receiver_methods = receiver_type.methods
-        method = receiver_methods.get(self.method_name)
+        method = receiver_type.method_named(self.method_name)
         return method.return_type
+    
+    def check_types(self):
+
+        self.receiver.check_types()
+        for arg in self.args:
+            arg.check_types()
+            
+        receiver_type = self.receiver.static_type()
+        method = receiver_type.method_named(self.method_name)
+        if method == None:
+            raise NoSuchJavaMethod("{0} has no method named {1}".format(receiver_type.name, self.method_name))
+            
+        expected_num_arguments = len(method.parameter_types)
+        actual_num_arguments = len(self.args)
+
+        if expected_num_arguments != actual_num_arguments:
+            raise JavaArgumentCountError("Wrong number of arguments for {0}.{1}(): expected {2}, got {3}".format(receiver_type.name, self.method_name, expected_num_arguments, actual_num_arguments))
+        
+        argument_types_match = True
+        actual_argument_types = []
+        for i in range(0, len(self.args)):
+            expected_type = method.parameter_types[i]
+            actual_type = self.args[i].static_type()
+
+            actual_argument_types.append(actual_type)
+            if actual_type != expected_type and not actual_type.is_subtype_of(expected_type):
+                argument_types_match = False
+        if not argument_types_match:
+            raise JavaTypeMismatchError("{0}.{1}() expects arguments of type {2}, but got {3}".format(receiver_type.name, self.method_name, _names(method.parameter_types), _names(actual_argument_types)))
+        return 
         
 class JavaConstructorCall(JavaExpression):
     """
