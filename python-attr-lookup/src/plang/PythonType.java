@@ -1,6 +1,7 @@
 package plang;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -41,7 +42,10 @@ public class PythonType extends PythonObject {
 
     @Override
     protected List<PythonObject> buildMRO() {
-        throw new UnsupportedOperationException("not implemented yet");
+        if (base == null) {
+            return Arrays.asList(this);
+        }
+        return Arrays.asList(this, base);
     }
 
     /**
@@ -49,7 +53,7 @@ public class PythonType extends PythonObject {
      * this PythonType.
      */
     public PythonObject instantiate() {
-        throw new UnsupportedOperationException("not implemented yet");
+        return new PythonObject(this);
     }
 
     @Override
