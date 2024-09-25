@@ -26,6 +26,7 @@ class JavaExpression(object):
         Subclasses must override this method.
         """
         raise NotImplementedError(type(self).__name__ + " must override check_types()")
+    
 
 
 class JavaVariable(JavaExpression):
@@ -65,6 +66,11 @@ class JavaNullLiteral(JavaLiteral):
     """
     def __init__(self):
         super().__init__("null", JavaBuiltInTypes.NULL)
+
+    def static_type(self):
+        return JavaBuiltInTypes.NULL
+    
+    
 
 
 class JavaAssignment(JavaExpression):
@@ -125,9 +131,19 @@ class JavaMethodCall(JavaExpression):
         self.receiver.check_types()
         for arg in self.args:
             arg.check_types()
-            
+
         receiver_type = self.receiver.static_type()
+
+        if receiver_type == JavaBuiltInTypes.NULL:
+            raise NoSuchJavaMethod("Cannot invoke method {0}() on null".format(self.method_name))
+        
+        if receiver_type == JavaBuiltInTypes.VOID:
+            raise NoSuchJavaMethod("Type void does not have methods")
+        
         method = receiver_type.method_named(self.method_name)
+        
+      
+        
         if method == None:
             raise NoSuchJavaMethod("{0} has no method named {1}".format(receiver_type.name, self.method_name))
             
@@ -168,6 +184,32 @@ class JavaConstructorCall(JavaExpression):
     def __init__(self, instantiated_type, *args):
         self.instantiated_type = instantiated_type
         self.args = args
+
+    def check_types(self):
+        if not self.instantiated_type.is_instantiable:
+            raise JavaIllegalInstantiationError("Type {0} is not instantiable".format(self.instantiated_type.name))
+        
+        expected_num_arguments = len(self.instantiated_type.constructor.parameter_types)
+        actual_num_arguments = len(self.args)
+
+        if expected_num_arguments != actual_num_arguments:
+            raise JavaArgumentCountError("Wrong number of arguments for {0} constructor: expected {1}, got {2}".format(self.instantiated_type.name, expected_num_arguments, actual_num_arguments))
+        
+        argument_types_match = True
+        actual_argument_types = []
+        for i in range(0, len(self.args)):
+            expected_type = self.instantiated_type.constructor.parameter_types[i]
+            actual_type = self.args[i].static_type()
+
+            actual_argument_types.append(actual_type)
+            if actual_type != expected_type and not actual_type.is_subtype_of(expected_type):
+                argument_types_match = False
+        if not argument_types_match:
+            raise JavaTypeMismatchError("{0} constructor expects arguments of type {1}, but got {2}".format(self.instantiated_type.name, _names(self.instantiated_type.constructor.parameter_types), _names(actual_argument_types)))
+        return
+        
+    def static_type(self):
+        return self.instantiated_type
 
 
 class JavaTypeMismatchError(JavaTypeError):
