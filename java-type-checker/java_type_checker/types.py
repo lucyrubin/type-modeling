@@ -89,6 +89,9 @@ class JavaPrimitiveType(JavaType):
     Primitive types are not object types and do not have methods.
     """
 
+    def is_subtype_of(self, other):
+        return (self.name == other.name) and (other.__class__ == JavaPrimitiveType)
+
 
 class JavaObjectType(JavaType):
     """
@@ -132,7 +135,38 @@ class JavaObjectType(JavaType):
                 except NoSuchJavaMethod:
                     pass
             raise NoSuchJavaMethod("{0} has no method named {1}".format(self.name, name))
+    
+    def is_subtype_of(self, other):
+        is_subtype = False
 
+        roots = [self]
+        
+        searching = True
+        # Non-recursive way to traverse the supertype tree
+        while searching:
+            ## Check if searching is finished
+            searching = False
+            for root in roots:
+                if root.direct_supertypes.count != 0:
+                    searching = True
+
+            temp_roots = []
+            for root in roots:
+                for supertype in root.direct_supertypes:
+                    # Update all of the root nodes
+                    temp_roots.append(supertype)
+
+                    ## Check if a supertype is found that matches
+                    if other in root.direct_supertypes:
+                        is_subtype = True
+                        searching = False
+                        break
+            
+            roots = temp_roots
+        
+        return (self.name == other.name) or (other in self.direct_supertypes) or is_subtype
+
+   
 
 class JavaVoidType(JavaType):
     """The Java type `void`.
